@@ -146,7 +146,7 @@ public:
     }
 
     async_task< sisl::GenericClientResponse > data_service_request_bidirectional(std::string request_name,
-                                                                                io_blob_list_t cli_buf) {
+                                                                                 io_blob_list_t cli_buf) {
         auto self = shared_from_this();
         auto response = co_await _generic_stub->call_unary_co(
             cli_buf, request_name, NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs));
@@ -182,7 +182,6 @@ public:
 
     ~grpc_proto_client() override = default;
 
-    std::shared_ptr< messaging_client > realClient() { return _client; }
     void setClient(std::shared_ptr< messaging_client > new_client) { _client = new_client; }
     bool reinitRequired() const { return (!_client || 0 < _client->bad_service.load(std::memory_order_relaxed)); }
 
@@ -205,12 +204,12 @@ public:
     // Returns the messaging_client's lazy task directly; that coroutine holds its own strong self-ref,
     // so it is safe even if this grpc_proto_client is destroyed before the task completes.
     null_async_task data_service_request_unidirectional(std::string const& request_name,
-                                                      io_blob_list_t const& cli_buf) {
+                                                        io_blob_list_t const& cli_buf) {
         return _client->data_service_request_unidirectional(request_name, cli_buf);
     }
 
     async_task< sisl::GenericClientResponse > data_service_request_bidirectional(std::string const& request_name,
-                                                                                io_blob_list_t const& cli_buf) {
+                                                                                 io_blob_list_t const& cli_buf) {
         return _client->data_service_request_bidirectional(request_name, cli_buf);
     }
 };
@@ -219,7 +218,7 @@ nuraft::cmd_result_code mesg_factory::create_client(peer_id_t const& client,
                                                     nuraft::ptr< nuraft::rpc_client >& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
     LOGD("Creating client to {}", client);
-    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_client(to_string(client)));
+    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_or_reinit_client(client));
     if (!m_client) return nuraft::CANCELLED;
     raft_client = std::make_shared< grpc_proto_client >(m_client, client, _group_id, _group_type, _metrics);
     return (!raft_client) ? nuraft::BAD_REQUEST : nuraft::OK;
@@ -229,20 +228,23 @@ nuraft::cmd_result_code mesg_factory::reinit_client(peer_id_t const& client,
                                                     std::shared_ptr< nuraft::rpc_client >& raft_client) {
     LOGD("Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< grpc_proto_client >(raft_client);
-    auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
-    if (auto err = _group_factory->reinit_client(client, new_raft_client); err) {
-        return err;
-    }
-    g_client->setClient(std::dynamic_pointer_cast< messaging_client >(new_raft_client));
+    if (!g_client) return nuraft::BAD_REQUEST;
+
+    // Refresh the shared messaging_client through group_factory's cache, then update this wrapper in place.
+    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_or_reinit_client(client));
+    if (!m_client) return nuraft::CANCELLED;
+    g_client->setClient(m_client);
     return nuraft::OK;
 }
 
 null_async_task mesg_factory::data_service_request_unidirectional(resolved_dest dest, std::string request_name,
-                                                                 io_blob_list_t cli_buf) {
+                                                                  io_blob_list_t cli_buf) {
     // NOTE: all `this`-state (client map, create_client) is touched BEFORE the first co_await, so the
     // factory need not be kept alive past suspension; the per-client tasks own what they need.
-    if (!dest) { co_return std::unexpected(dest.error()); } // destination could not be resolved
-    if (dest->has_value()) {                                // a specific peer
+    if (!dest) {
+        co_return std::unexpected(dest.error());
+    } // destination could not be resolved
+    if (dest->has_value()) { // a specific peer
         auto const peer = dest->value();
 
         // Resolve (or create) the client under the read lock, then release it before suspending.
@@ -255,7 +257,7 @@ null_async_task mesg_factory::data_service_request_unidirectional(resolved_dest 
         }
         if (!g_client) {
             LOGI("Client not found, attempting to create client for [{}], request name [{}]", peer, request_name);
-            g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(create_client(peer));
+            g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(create_or_reinit_client(peer));
         }
         if (!g_client) {
             LOGE("Failed to create client for [{}], request name [{}]", peer, request_name);
@@ -280,10 +282,11 @@ null_async_task mesg_factory::data_service_request_unidirectional(resolved_dest 
 }
 
 async_task< sisl::GenericClientResponse >
-mesg_factory::data_service_request_bidirectional(resolved_dest dest, std::string request_name,
-                                                 io_blob_list_t cli_buf) {
-    if (!dest) { co_return std::unexpected(dest.error()); } // destination could not be resolved
-    if (!dest->has_value()) {                               // broadcast: not supported for a bidirectional request
+mesg_factory::data_service_request_bidirectional(resolved_dest dest, std::string request_name, io_blob_list_t cli_buf) {
+    if (!dest) {
+        co_return std::unexpected(dest.error());
+    } // destination could not be resolved
+    if (!dest->has_value()) { // broadcast: not supported for a bidirectional request
         LOGE("Cannot send request to all the peers, not implemented yet!. Request name [{}]", request_name);
         co_return std::unexpected(to_condition(nuraft::cmd_result_code::BAD_REQUEST));
     }
@@ -303,7 +306,7 @@ mesg_factory::data_service_request_bidirectional(resolved_dest dest, std::string
     if (!g_client) {
         // Client not found or needs reinit - use create_client to handle both cases
         LOGI("Client not found, attempting to create client for [{}], request name [{}]", peer, request_name);
-        g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(create_client(peer));
+        g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(create_or_reinit_client(peer));
     }
     if (!g_client) {
         LOGE("Failed to create/reinit client for [{}], request name [{}]", peer, request_name);
