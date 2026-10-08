@@ -26,7 +26,7 @@ TEST_F(MessagingFixture, BasicTests) {
 
     auto sm1 = app_1_->state_mgr_map_[group_id_];
     auto repl_ctx1 = sm1->get_repl_context();
-    //app_1 is leader
+    // app_1 is leader
     EXPECT_TRUE(repl_ctx1->is_raft_leader());
 
     // Basic resiliency test (append_entries)
@@ -69,10 +69,10 @@ TEST_F(MessagingFixture, BasicTests) {
     app_3_.reset();
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    //now app_1 will be the leader as it has highest priority
+    // now app_1 will be the leader as it has highest priority
     EXPECT_TRUE(repl_ctx1->is_raft_leader());
 
-    //restart app_3
+    // restart app_3
     app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
     app_3_->set_id(our_id);
     app_3_->map_peers(lookup_map);

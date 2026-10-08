@@ -72,11 +72,11 @@ public:
 
     // Construct and send an AddServer message to the cluster
     [[nodiscard]] null_async_task add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
-                                           nuraft::srv_config const& dest_cfg);
+                                             nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
     [[nodiscard]] null_async_task append_entry(std::shared_ptr< nuraft::buffer > buf,
-                                             nuraft::srv_config const& dest_cfg);
+                                               nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster
     [[nodiscard]] null_async_task rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);

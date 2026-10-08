@@ -52,15 +52,15 @@ public:
     jungle_log_store(const std::string& log_dir, const Options& opt = jungle_log_store::Options());
     ~jungle_log_store();
 
-    __nocopy__(jungle_log_store)
+__nocopy__(jungle_log_store)
 
-        public :
-            /**
-             * The first available slot of the store, starts with 1.
-             *
-             * @return Last log index number + 1
-             */
-            virtual ulong next_slot() const;
+    public :
+        /**
+         * The first available slot of the store, starts with 1.
+         *
+         * @return Last log index number + 1
+         */
+        virtual ulong next_slot() const;
 
     /**
      * The start index of the log store, at the very beginning, it must be 1.

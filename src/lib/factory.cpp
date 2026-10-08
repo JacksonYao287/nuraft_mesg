@@ -147,14 +147,18 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(std::string const&
     try {
         // Explicit true: NuRaft is the only caller that must observe a new get_id().
         return create_or_reinit_client(boost::uuids::string_generator()(client), true);
-    } catch (std::runtime_error const& e) { LOGC("Client Endpoint Invalid! [{}]", client); }
+    } catch (std::runtime_error const& e) {
+        LOGC("Client Endpoint Invalid! [{}]", client);
+    }
     return nullptr;
 }
 
 nuraft::ptr< nuraft::rpc_client > grpc_factory::create_or_reinit_client(std::string const& client) {
     try {
         return create_or_reinit_client(boost::uuids::string_generator()(client));
-    } catch (std::runtime_error const& e) { LOGC("Client Endpoint Invalid! [{}]", client); }
+    } catch (std::runtime_error const& e) {
+        LOGC("Client Endpoint Invalid! [{}]", client);
+    }
     return nullptr;
 }
 
@@ -183,15 +187,19 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_or_reinit_client(peer_id_
         } else {
             new_client = it->second;
         }
-        if (!it->second) { _clients.erase(it); }
+        if (!it->second) {
+            _clients.erase(it);
+        }
     }
     return new_client;
 }
 
 null_async_task grpc_factory::add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
-                                       nuraft::srv_config const& dest_cfg) {
+                                         nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return make_ready< null_result >(to_null_result(nuraft::CANCELLED)); }
+    if (!client) {
+        return make_ready< null_result >(to_null_result(nuraft::CANCELLED));
+    }
 
     auto ctx = std::make_shared< client_ctx< uint32_t > >(srv_id, shared_from_this(), dest_cfg.get_id(), srv_addr);
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -206,7 +214,9 @@ null_async_task grpc_factory::add_server(uint32_t const srv_id, peer_id_t const&
 
 null_async_task grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return make_ready< null_result >(to_null_result(nuraft::CANCELLED)); }
+    if (!client) {
+        return make_ready< null_result >(to_null_result(nuraft::CANCELLED));
+    }
 
     auto ctx = std::make_shared< client_ctx< int32_t > >(srv_id, shared_from_this(), dest_cfg.get_id());
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -221,7 +231,9 @@ null_async_task grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_conf
 
 null_async_task grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return make_ready< null_result >(to_null_result(nuraft::CANCELLED)); }
+    if (!client) {
+        return make_ready< null_result >(to_null_result(nuraft::CANCELLED));
+    }
 
     auto ctx =
         std::make_shared< client_ctx< std::shared_ptr< nuraft::buffer > > >(buf, shared_from_this(), dest_cfg.get_id());

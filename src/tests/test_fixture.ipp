@@ -144,7 +144,7 @@ struct custom_factory : public nuraft_mesg::group_factory {
         return it == _clients.end() ? nullptr : it->second;
     }
 
-    std::string lookupEndpoint(nuraft_mesg::peer_id_t const& peer) override {
+    std::string lookup_endpoint(nuraft_mesg::peer_id_t const& peer) override {
         auto lg = std::scoped_lock(lookup_lock_);
         return (lookup_map_.count(peer) > 0) ? lookup_map_[peer] : std::string();
     }
