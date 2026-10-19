@@ -203,7 +203,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_or_reinit_client(peer_id_
 
 null_async_task grpc_factory::add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
                                          nuraft::srv_config const& dest_cfg) {
-    auto client = create_client(dest_cfg.get_endpoint());
+    auto client = create_or_reinit_client(dest_cfg.get_endpoint());
     if (!client) {
         return make_ready< null_result >(to_null_result(nuraft::CANCELLED));
     }
@@ -220,7 +220,7 @@ null_async_task grpc_factory::add_server(uint32_t const srv_id, peer_id_t const&
 }
 
 null_async_task grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg) {
-    auto client = create_client(dest_cfg.get_endpoint());
+    auto client = create_or_reinit_client(dest_cfg.get_endpoint());
     if (!client) {
         return make_ready< null_result >(to_null_result(nuraft::CANCELLED));
     }
@@ -237,7 +237,7 @@ null_async_task grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_conf
 }
 
 null_async_task grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg) {
-    auto client = create_client(dest_cfg.get_endpoint());
+    auto client = create_or_reinit_client(dest_cfg.get_endpoint());
     if (!client) {
         return make_ready< null_result >(to_null_result(nuraft::CANCELLED));
     }
